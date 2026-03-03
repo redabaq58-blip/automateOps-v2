@@ -1682,6 +1682,77 @@ CREATE INDEX idx_runs_created ON automation_runs(created_at DESC);
     }
 
 
+
+# ─── Workflow Templates (Real-World Playbooks) ───
+@api_router.get("/workflow-templates")
+async def get_workflow_templates(
+    category: Optional[str] = Query(None),
+    occupation_code: Optional[str] = Query(None),
+    complexity: Optional[str] = Query(None),
+    limit: int = Query(50, le=100)
+):
+    """Get real-world workflow templates from GitHub repos/agencies"""
+    
+    query = {}
+    if category:
+        query["category"] = category
+    if occupation_code:
+        query["mapped_occupations"] = occupation_code
+    if complexity:
+        query["complexity"] = complexity
+    
+    templates = await db.workflow_templates.find(query, {"_id": 0}).limit(limit).to_list(limit)
+    
+    # Get categories for filtering
+    all_categories = await db.workflow_templates.distinct("category")
+    
+    return {
+        "total": len(templates),
+        "categories": all_categories,
+        "templates": templates
+    }
+
+
+@api_router.get("/workflow-templates/{template_id}")
+async def get_workflow_template(template_id: str):
+    """Get a single workflow template with full details"""
+    
+    template = await db.workflow_templates.find_one({"id": template_id}, {"_id": 0})
+    
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    # Get linked occupations
+    if template.get("mapped_occupations"):
+        occupations = []
+        for code in template["mapped_occupations"][:5]:
+            occ = await db.occupations.find_one(
+                {"onet_code": code},
+                {"_id": 0, "onet_code": 1, "title_en": 1, "slug": 1}
+            )
+            if occ:
+                occupations.append(occ)
+        template["linked_occupations"] = occupations
+    
+    return template
+
+
+@api_router.get("/occupations/{code}/workflows")
+async def get_occupation_workflows(code: str):
+    """Get workflow templates mapped to a specific occupation"""
+    
+    templates = await db.workflow_templates.find(
+        {"mapped_occupations": code},
+        {"_id": 0, "id": 1, "title": 1, "category": 1, "step_count": 1, "complexity": 1, "source": 1}
+    ).limit(20).to_list(20)
+    
+    return {
+        "occupation_code": code,
+        "total_templates": len(templates),
+        "templates": templates
+    }
+
+
 def generate_implementation_notes(automation_type: str) -> str:
     """Generate implementation guidance"""
     
