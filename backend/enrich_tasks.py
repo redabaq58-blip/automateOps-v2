@@ -148,37 +148,20 @@ async def main():
         return
 
     print("=" * 60)
-    print("LLM Task Enrichment - FULL RUN")
+    print("LLM Task Enrichment - PRIORITY OCCUPATIONS ONLY")
     print("=" * 60)
 
     total_enriched = 0
 
-    # Enrich priority occupations first
-    for code in PRIORITY_CODES:
+    # Enrich ONLY priority occupations for investor demo
+    logger.info(f"Processing {len(PRIORITY_CODES)} priority occupations...")
+    for i, code in enumerate(PRIORITY_CODES, 1):
+        logger.info(f"[{i}/{len(PRIORITY_CODES)}] Processing {code}...")
         count = await enrich_occupation_tasks(code, llm_key)
         total_enriched += count
+        logger.info(f"  Enriched {count} tasks for {code} | Total: {total_enriched}")
 
-    # Then enrich ALL remaining occupations
-    from pymongo import MongoClient as SyncClient
-    sync_client = SyncClient(mongo_url)
-    sync_db = sync_client[db_name]
-
-    # Get all occupation codes that still have unenriched tasks
-    pipeline = [
-        {"$match": {"enriched": {"$ne": True}}},
-        {"$group": {"_id": "$onet_code"}},
-    ]
-    unenriched_codes = [doc["_id"] for doc in sync_db.tasks.aggregate(pipeline)]
-    logger.info(f"Found {len(unenriched_codes)} occupations with unenriched tasks")
-    sync_client.close()
-
-    for i, code in enumerate(unenriched_codes):
-        count = await enrich_occupation_tasks(code, llm_key)
-        total_enriched += count
-        if (i + 1) % 20 == 0:
-            logger.info(f"Progress: {i+1}/{len(unenriched_codes)} occupations processed, {total_enriched} total enriched")
-
-    print(f"\nTotal enriched: {total_enriched} tasks")
+    print(f"\n✅ COMPLETE: {total_enriched} tasks enriched across {len(PRIORITY_CODES)} priority occupations")
     print("=" * 60)
 
 
