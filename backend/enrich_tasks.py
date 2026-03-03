@@ -1,32 +1,3 @@
-sed -n '51,100p' /app/backend/enrich_tasks.py
-clear && cat /app/backend/enrich_tasks.py
-cat -n /app/backend/enrich_tasks.py | head -n 50
-sed -n '51,100p' /app/backend/enrich_tasks.py
-wc -l /app/backend/enrich_tasks.py
-wc -l /app/backend/enrich_tasks.py
-sed -n '1,60p' /app/backend/enrich_tasks.py
-sed -n '61,120p' /app/backend/enrich_tasks.py
-sed -n '121,163p' /app/backend/enrich_tasks.py
-wc -l /app/backend/ingest_esco.py
-sed -n '1,60p' /app/backend/ingest_esco.py
-sed -n '61,108p' /app/backend/ingest_esco.py
-sed -n '109,144p' /app/backend/ingest_esco.py
-wc -l /app/backend/ingest_noc.py
-wc -l /app/backend/ingest_noc.py
-sed -n '1,60p' /app/backend/ingest_noc.py
-sed -n '61,144p' /app/backend/ingest_noc.py
-sed -n '119,144p' /app/backend/ingest_noc.py
-wc -l /app/backend/ingest_oasis.py
-
-sed -n '1,60p' /app/backend/ingest_oasis.py
-sed -n '61,144p' /app/backend/ingest_oasis.py
-wc -l /app/backend/ingest_onet.py
-sed -n '1,60p' /app/backend/ingest_onet.py
-sed -n '61,144p' /app/backend/ingest_onet.py
-cat /app/test_result.md
-cat /app/test_result.md
-clear && cat /app/test_result.md
-clear && tail -n 50 /app/test_result.md
 """
 LLM Task Enrichment Script
 Enriches task statements with automation scores, edge cases, and regulatory notes.
