@@ -16,6 +16,8 @@ import AutomationBuilder from '@/pages/AutomationBuilder';
 import AutomationGoldmines from '@/pages/AutomationGoldmines';
 import PricingPage from '@/pages/PricingPage';
 import WorkflowTemplates from '@/pages/WorkflowTemplates';
+import AgentBuilder from '@/pages/AgentBuilder';
+import DataSources from '@/pages/DataSources';
 import '@/App.css';
 
 // Auth Context
@@ -87,6 +89,8 @@ function App() {
               <Route path="/goldmines" element={<AutomationGoldmines />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/templates" element={<WorkflowTemplates />} />
+              <Route path="/agent-builder" element={<AgentBuilder />} />
+              <Route path="/data-sources" element={<DataSources />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/auth" element={<AuthPage />} />
