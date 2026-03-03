@@ -40,6 +40,9 @@ function Header() {
             <Link to="/automation-builder" className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-md transition-colors flex items-center gap-1.5" data-testid="nav-automation-builder">
               <Zap className="w-3.5 h-3.5" /> Builder
             </Link>
+            <Link to="/pricing" className="px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-md transition-colors font-medium" data-testid="nav-pricing">
+              Pricing
+            </Link>
             {user && (
               <>
                 <Link to="/dashboard" className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-md transition-colors flex items-center gap-1.5" data-testid="nav-dashboard">

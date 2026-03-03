@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowRight, Database, Code2, Download, Zap, ChevronRight, MessageSquare, Sparkles } from 'lucide-react';
+import { Search, ArrowRight, Database, Code2, Download, Zap, ChevronRight, MessageSquare, Sparkles, TrendingUp, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -8,11 +8,16 @@ import { statsAPI } from '@/lib/api';
 import { useLang } from '@/App';
 import { t } from '@/lib/translations';
 import AskDataDialog from '@/components/AskDataDialog';
+import ROICalculator from '@/components/ROICalculator';
+import axios from 'axios';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 export default function HomePage() {
   const [query, setQuery] = useState('');
   const [stats, setStats] = useState(null);
   const [featured, setFeatured] = useState([]);
+  const [topGoldmine, setTopGoldmine] = useState(null);
   const [showAsk, setShowAsk] = useState(false);
   const { lang } = useLang();
   const navigate = useNavigate();
@@ -20,6 +25,10 @@ export default function HomePage() {
   useEffect(() => {
     statsAPI.get().then(r => setStats(r.data)).catch(() => {});
     statsAPI.featured().then(r => setFeatured(r.data.featured || [])).catch(() => {});
+    // Fetch top goldmine
+    axios.get(`${BACKEND_URL}/api/automation-goldmines?limit=1`)
+      .then(r => setTopGoldmine(r.data.goldmines?.[0]))
+      .catch(() => {});
   }, []);
 
   const handleSearch = (e) => {
@@ -112,6 +121,96 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+
+      {/* Featured Goldmine + ROI Calculator */}
+      {topGoldmine && (
+        <section className="py-16 px-6 bg-gradient-to-b from-zinc-950 to-zinc-900/50">
+          <div className="max-w-[1400px] mx-auto">
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full mb-4">
+                <TrendingUp className="w-4 h-4 text-amber-400" />
+                <span className="text-sm text-amber-400 font-semibold">Top Automation Goldmine</span>
+              </div>
+              <h2 className="text-3xl font-bold mb-2">Build a Product in 5 Days</h2>
+              <p className="text-zinc-400">Complete implementation guide with working code</p>
+            </div>
+
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Featured Goldmine Card */}
+              <div className="lg:col-span-2 bg-gradient-to-br from-indigo-950/40 to-purple-950/40 rounded-xl p-8 border border-indigo-500/30">
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-lg font-bold">
+                        #1
+                      </span>
+                      <span className="px-2 py-1 bg-amber-500/20 text-amber-400 text-xs font-semibold rounded border border-amber-500/30">
+                        {topGoldmine.task.automation_type}
+                      </span>
+                    </div>
+                    <h3 className="text-2xl font-bold text-zinc-100 mb-2">
+                      {topGoldmine.task.statement}
+                    </h3>
+                    <p className="text-zinc-400">{topGoldmine.occupation.title}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-3xl font-bold text-green-400">
+                      {Math.round(topGoldmine.task.automation_score * 100)}%
+                    </div>
+                    <div className="text-xs text-zinc-500">Automatable</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="bg-zinc-900/50 rounded-lg p-3 border border-zinc-800">
+                    <DollarSign className="w-5 h-5 text-green-400 mb-2" />
+                    <div className="text-lg font-bold text-zinc-100">
+                      {topGoldmine.implementation.business_metrics.arr_potential}
+                    </div>
+                    <div className="text-xs text-zinc-500">ARR Potential</div>
+                  </div>
+                  <div className="bg-zinc-900/50 rounded-lg p-3 border border-zinc-800">
+                    <TrendingUp className="w-5 h-5 text-indigo-400 mb-2" />
+                    <div className="text-lg font-bold text-zinc-100">
+                      {topGoldmine.implementation.business_metrics.potential_users}
+                    </div>
+                    <div className="text-xs text-zinc-500">Potential Users</div>
+                  </div>
+                  <div className="bg-zinc-900/50 rounded-lg p-3 border border-zinc-800">
+                    <Zap className="w-5 h-5 text-amber-400 mb-2" />
+                    <div className="text-lg font-bold text-zinc-100">
+                      {topGoldmine.implementation.build_timeline.mvp}
+                    </div>
+                    <div className="text-xs text-zinc-500">Build Time</div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => navigate('/goldmines')}
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2"
+                  >
+                    View Implementation Guide <ArrowRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => navigate('/pricing')}
+                    className="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-semibold rounded-lg transition-all"
+                  >
+                    Pricing
+                  </button>
+                </div>
+              </div>
+
+              {/* ROI Calculator */}
+              <div>
+                <ROICalculator />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
 
       {/* Featured Occupations */}
       <section className="py-16 px-6">
