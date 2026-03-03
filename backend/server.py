@@ -849,6 +849,202 @@ async def heatmap_industry_detail(group_code: str):
         "occupations": result,
     }
 
+
+# ─── Automation Builder ───
+@api_router.get("/automation-opportunities")
+async def get_automation_opportunities(
+    min_score: float = Query(0.6, ge=0, le=1),
+    automation_type: Optional[str] = Query(None),
+    limit: int = Query(50, le=200)
+):
+    """Get high-automation tasks with ready-to-use prompts and templates"""
+    
+    # Build query
+    query = {"enriched": True, "automatable_score": {"$gte": min_score}}
+    if automation_type:
+        query["automation_type"] = automation_type
+    
+    # Get tasks sorted by automation score
+    tasks = await db.tasks.find(query, {"_id": 0}).sort("automatable_score", -1).limit(limit).to_list(limit)
+    
+    # Get occupation details for each task
+    onet_codes = list(set(t["onet_code"] for t in tasks))
+    occupations = {}
+    for code in onet_codes:
+        occ = await db.occupations.find_one({"onet_code": code}, {"_id": 0, "title_en": 1, "definition_en": 1, "major_group": 1})
+        if occ:
+            occupations[code] = occ
+    
+    # Generate prompt templates for each task
+    opportunities = []
+    for task in tasks:
+        occ = occupations.get(task["onet_code"], {})
+        
+        # Generate automation prompt based on type
+        prompt_template = generate_automation_prompt(
+            task_statement=task.get("statement_en", ""),
+            occupation_title=occ.get("title_en", ""),
+            automation_type=task.get("automation_type", ""),
+            edge_cases=task.get("edge_cases", ""),
+            importance=task.get("importance", 0)
+        )
+        
+        # Generate workflow steps
+        workflow_steps = generate_workflow_steps(
+            task.get("statement_en", ""),
+            task.get("automation_type", "")
+        )
+        
+        opportunities.append({
+            "task": {
+                "onet_code": task.get("onet_code"),
+                "task_id": task.get("task_id"),
+                "statement": task.get("statement_en"),
+                "importance": task.get("importance"),
+                "automatable_score": task.get("automatable_score"),
+                "automation_type": task.get("automation_type"),
+                "edge_cases": task.get("edge_cases"),
+            },
+            "occupation": {
+                "code": task.get("onet_code"),
+                "title": occ.get("title_en", ""),
+                "definition": occ.get("definition_en", "")[:200] + "..." if occ.get("definition_en") else ""
+            },
+            "automation_guide": {
+                "prompt_template": prompt_template,
+                "workflow_steps": workflow_steps,
+                "implementation_notes": generate_implementation_notes(task.get("automation_type", ""))
+            }
+        })
+    
+    return {
+        "total": len(opportunities),
+        "min_score": min_score,
+        "opportunities": opportunities
+    }
+
+
+def generate_automation_prompt(task_statement: str, occupation_title: str, automation_type: str, edge_cases: str, importance: float) -> str:
+    """Generate ready-to-use prompt for AI automation"""
+    
+    # Handle None values
+    task_statement = task_statement or "Task"
+    occupation_title = occupation_title or "Professional"
+    edge_cases = edge_cases or "Standard professional judgment applies"
+    importance = importance or 50.0
+    
+    if automation_type == "LLM":
+        return f"""# AI Agent Prompt for: {task_statement}
+
+You are an AI assistant helping with {occupation_title} tasks.
+
+**Task:** {task_statement}
+
+**Your role:**
+- Analyze the input data/request
+- Apply professional {occupation_title} knowledge
+- Provide accurate, compliant output
+- Flag any edge cases or uncertainties
+
+**Edge cases to watch:**
+{edge_cases or 'Standard professional judgment applies'}
+
+**Output format:** [Specify: JSON, text, structured report, etc.]
+
+**Example:**
+Input: [Provide sample input]
+Output: [Your structured response here]"""
+    
+    elif automation_type == "RPA":
+        return f"""# RPA Bot Configuration for: {task_statement}
+
+**Automation Target:** {task_statement}
+**Occupation:** {occupation_title}
+**Task Importance:** {importance:.1f}/100
+
+**RPA Workflow:**
+1. **Trigger:** [Define trigger event]
+2. **Input Collection:** [Specify data sources]
+3. **Processing Steps:**
+   - Navigate to [application/system]
+   - Extract [specific data]
+   - Validate [criteria]
+   - Execute [action]
+4. **Output:** [Where results go]
+5. **Error Handling:** Check for {edge_cases or 'standard exceptions'}
+
+**Tools Required:** UiPath, Automation Anywhere, or Python (selenium/playwright)"""
+    
+    else:  # Hybrid
+        return f"""# Hybrid Automation (RPA + AI) for: {task_statement}
+
+**Task:** {task_statement}
+**Occupation:** {occupation_title}
+**Approach:** RPA for structure + AI for intelligence
+
+**Phase 1 - RPA Component:**
+- Collect data from [systems]
+- Extract structured information
+- Route to AI for analysis
+
+**Phase 2 - AI Component:**
+Prompt: "You are analyzing {task_statement} for {occupation_title}. 
+Input data: [RPA extracted data]
+Task: Apply professional judgment to [specific decision]
+Consider: {edge_cases or 'standard professional factors'}
+Output: [Structured recommendation]"
+
+**Phase 3 - RPA Finalization:**
+- Take AI output
+- Update [destination systems]
+- Log results
+- Notify stakeholders
+
+**Tech Stack:** Zapier/Make.com + OpenAI/Claude API"""
+
+
+def generate_workflow_steps(task_statement: str, automation_type: str) -> list:
+    """Generate step-by-step workflow"""
+    
+    if automation_type == "LLM":
+        return [
+            "1. Collect input data from user/system",
+            "2. Structure data for LLM prompt",
+            "3. Send to GPT-4/Claude with task-specific prompt",
+            "4. Parse and validate AI response",
+            "5. Format output for end system",
+            "6. Log interaction for compliance"
+        ]
+    elif automation_type == "RPA":
+        return [
+            "1. Monitor trigger (email, file, schedule)",
+            "2. Launch automation bot",
+            "3. Navigate to target application",
+            "4. Extract required data fields",
+            "5. Execute task actions (click, type, submit)",
+            "6. Capture results and log completion"
+        ]
+    else:  # Hybrid
+        return [
+            "1. RPA: Collect data from multiple sources",
+            "2. RPA: Standardize and clean data",
+            "3. AI: Analyze data with LLM (apply judgment)",
+            "4. AI: Generate recommendation/output",
+            "5. RPA: Route AI output to destination",
+            "6. RPA: Update systems and notify users"
+        ]
+
+
+def generate_implementation_notes(automation_type: str) -> str:
+    """Generate implementation guidance"""
+    
+    notes = {
+        "LLM": "Best for tasks requiring reasoning, language processing, or judgment. Use OpenAI, Anthropic, or open-source models. Ensure prompt engineering for accuracy. Monitor costs per API call.",
+        "RPA": "Best for repetitive, rule-based tasks with structured data. Use desktop automation tools. Requires stable UI/API. Handle exceptions gracefully. Schedule during low-usage periods.",
+        "Hybrid": "Combines RPA reliability with AI intelligence. RPA handles data movement, AI handles decisions. Most powerful but requires integration. Consider Zapier/Make.com for low-code option."
+    }
+    return notes.get(automation_type, "Evaluate task complexity and choose appropriate automation approach.")
+
 # ─── Mount router & middleware ───
 app.include_router(api_router)
 

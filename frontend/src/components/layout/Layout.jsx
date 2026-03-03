@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/App';
 import { useLang } from '@/App';
-import { Search, Database, FolderTree, User, LogOut, Globe, LayoutDashboard, Package, Shield, Flame } from 'lucide-react';
+import { Search, Database, FolderTree, User, LogOut, Globe, LayoutDashboard, Package, Shield, Flame, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { t } from '@/lib/translations';
 
@@ -33,6 +33,9 @@ function Header() {
             </Link>
             <Link to="/heatmap" className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-md transition-colors flex items-center gap-1.5" data-testid="nav-heatmap">
               <Flame className="w-3.5 h-3.5" /> Heatmap
+            </Link>
+            <Link to="/automation-builder" className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-md transition-colors flex items-center gap-1.5" data-testid="nav-automation-builder">
+              <Zap className="w-3.5 h-3.5" /> Builder
             </Link>
             {user && (
               <>
