@@ -132,8 +132,8 @@ export default function HomePage() {
                 <TrendingUp className="w-4 h-4 text-amber-400" />
                 <span className="text-sm text-amber-400 font-semibold">Top Automation Goldmine</span>
               </div>
-              <h2 className="text-3xl font-bold mb-2">Build a Product in 5 Days</h2>
-              <p className="text-zinc-400">Complete implementation guide with working code</p>
+              <h2 className="text-3xl font-bold mb-2">Research Validated, Implementation Guided</h2>
+              <p className="text-zinc-400">Starting templates based on government data + AI analysis (Domain expertise required)</p>
             </div>
 
             <div className="grid lg:grid-cols-3 gap-6">
@@ -267,6 +267,61 @@ export default function HomePage() {
             ))}
           </div>
         </div>
+
+
+      {/* Data Provenance & Transparency */}
+      <section className="py-16 px-6 bg-zinc-900/50 border-y border-zinc-800">
+        <div className="max-w-[1400px] mx-auto">
+          <h2 className="text-2xl font-semibold text-center mb-10">Data Transparency & Sources</h2>
+          
+          <div className="grid md:grid-cols-3 gap-6 mb-10">
+            <div className="bg-zinc-950 rounded-lg p-6 border border-zinc-800">
+              <h3 className="text-lg font-semibold mb-3 text-indigo-400">✓ What We Provide</h3>
+              <ul className="space-y-2 text-sm text-zinc-300">
+                <li>• Government occupation data (O*NET 30.2, NOC 2021)</li>
+                <li>• AI automation scores (457 tasks analyzed)</li>
+                <li>• Implementation starting templates</li>
+                <li>• Market sizing methodology</li>
+                <li>• Tech stack recommendations</li>
+              </ul>
+            </div>
+
+            <div className="bg-zinc-950 rounded-lg p-6 border border-amber-500/30">
+              <h3 className="text-lg font-semibold mb-3 text-amber-400">⚠️ What You Must Add</h3>
+              <ul className="space-y-2 text-sm text-zinc-300">
+                <li>• Domain expert validation</li>
+                <li>• Industry-specific compliance</li>
+                <li>• Production error handling</li>
+                <li>• User authentication/authorization</li>
+                <li>• Customer discovery & testing</li>
+              </ul>
+            </div>
+
+            <div className="bg-zinc-950 rounded-lg p-6 border border-zinc-800">
+              <h3 className="text-lg font-semibold mb-3 text-emerald-400">📊 Data Sources</h3>
+              <ul className="space-y-2 text-sm text-zinc-300">
+                <li>• <strong>O*NET 30.2</strong> - US Dept of Labor (CC BY 4.0)</li>
+                <li>• <strong>NOC 2021</strong> - Statistics Canada</li>
+                <li>• <strong>ESCO v1.2.1</strong> - European Commission</li>
+                <li>• <strong>AI Scores</strong> - GPT-4o analysis (2.4% coverage)</li>
+                <li>• Updated: 2024-2025 data</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="bg-zinc-950 rounded-lg p-6 border border-zinc-800 max-w-3xl mx-auto">
+            <h3 className="text-lg font-semibold mb-3">💡 How to Use This Data</h3>
+            <div className="text-sm text-zinc-400 space-y-2">
+              <p><strong className="text-zinc-300">1. Start with research:</strong> Use our goldmines to identify opportunities</p>
+              <p><strong className="text-zinc-300">2. Validate the market:</strong> Interview 10-20 target users before building</p>
+              <p><strong className="text-zinc-300">3. Customize code:</strong> Our templates are starting points, not production-ready</p>
+              <p><strong className="text-zinc-300">4. Add domain expertise:</strong> Partner with professionals in the field</p>
+              <p><strong className="text-zinc-300">5. Test thoroughly:</strong> Real-world validation is essential</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       </section>
 
       <AskDataDialog open={showAsk} onOpenChange={setShowAsk} />

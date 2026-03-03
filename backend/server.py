@@ -936,24 +936,68 @@ def generate_automation_prompt(task_statement: str, occupation_title: str, autom
     if automation_type == "LLM":
         return f"""# AI Agent Prompt for: {task_statement}
 
-You are an AI assistant helping with {occupation_title} tasks.
+⚠️ IMPORTANT: This is a STARTING TEMPLATE based on O*NET data analysis.
+REQUIRED: Validate with {occupation_title} domain experts before production use.
 
-**Task:** {task_statement}
+**Task Context (from O*NET 30.2):**
+- Occupation: {occupation_title}
+- Task Importance: {importance:.1f}/100 (higher = more critical)
+- Automation Confidence: {automation_score*100:.0f}%
+- Required Knowledge: {', '.join(actual_knowledge)}
+- Key Skills Needed: {', '.join(actual_skills)}
 
-**Your role:**
-- Analyze the input data/request
-- Apply professional {occupation_title} knowledge
-- Provide accurate, compliant output
-- Flag any edge cases or uncertainties
+**Your AI Agent Should:**
+1. Analyze the input using professional {occupation_title} standards
+2. Apply knowledge of: {', '.join(actual_knowledge)}
+3. Consider these edge cases: {edge_cases}
+4. Flag uncertainties - DO NOT hallucinate
+5. Output structured, verifiable results
 
-**Edge cases to watch:**
-{edge_cases or 'Standard professional judgment applies'}
+**Example Prompt Structure:**
+```
+You are a specialized AI assistant for {occupation_title} tasks.
 
-**Output format:** [Specify: JSON, text, structured report, etc.]
+Context: {task_statement}
 
-**Example:**
-Input: [Provide sample input]
-Output: [Your structured response here]"""
+Required expertise areas:
+- {', '.join(actual_knowledge)}
+
+Critical skills to apply:
+- {', '.join(actual_skills)}
+
+Input data: [Provide structured input]
+
+IMPORTANT CONSTRAINTS:
+- Only use information from the input data
+- Flag missing information - do not infer
+- Indicate confidence level (High/Medium/Low)
+- Reference relevant standards/regulations
+- Consider edge cases: {edge_cases}
+
+Output format:
+{{
+  "result": "...",
+  "confidence": "High/Medium/Low",
+  "missing_info": ["..."],
+  "validation_required": ["..."],
+  "edge_case_flags": ["..."]
+}}
+```
+
+**VALIDATION CHECKLIST:**
+□ Tested with real {occupation_title} professionals
+□ Handles all edge cases documented above
+□ Compliance requirements verified
+□ Error handling for missing/invalid data
+□ Human review process for low-confidence outputs
+□ Logging for audit trail
+
+**What This Template DOES NOT Include:**
+- Industry-specific compliance rules (you must add)
+- Integration with tools: {', '.join(actual_tools)}
+- Data validation logic (you must implement)
+- Error recovery workflows
+- User authentication/authorization"""
     
     elif automation_type == "RPA":
         return f"""# RPA Bot Configuration for: {task_statement}
@@ -1063,7 +1107,7 @@ async def get_automation_goldmines(limit: int = Query(30, le=50)):
     
     tasks = await db.tasks.aggregate(pipeline).to_list(limit)
     
-    # Get occupation details
+    # Get occupation details with actual skills and tools
     onet_codes = list(set(t["onet_code"] for t in tasks))
     occupations = {}
     for code in onet_codes:
@@ -1072,6 +1116,27 @@ async def get_automation_goldmines(limit: int = Query(30, le=50)):
             {"_id": 0, "title_en": 1, "definition_en": 1, "major_group": 1}
         )
         if occ:
+            # Get top 5 skills for this occupation
+            skills = await db.skills.find(
+                {"onet_code": code}, 
+                {"_id": 0, "name": 1, "importance": 1}
+            ).sort("importance", -1).limit(5).to_list(5)
+            
+            # Get top 5 tools/tech for this occupation
+            tools = await db.tools_technology.find(
+                {"onet_code": code, "type": "technology"},
+                {"_id": 0, "name": 1, "hot_technology": 1}
+            ).limit(5).to_list(5)
+            
+            # Get top 3 knowledge areas
+            knowledge = await db.knowledge.find(
+                {"onet_code": code},
+                {"_id": 0, "name": 1, "importance": 1}
+            ).sort("importance", -1).limit(3).to_list(3)
+            
+            occ["skills"] = skills
+            occ["tools"] = tools
+            occ["knowledge"] = knowledge
             occupations[code] = occ
     
     # Get total workforce size per occupation (for market sizing)
@@ -1106,7 +1171,7 @@ async def get_automation_goldmines(limit: int = Query(30, le=50)):
         major_group = occ.get("major_group", "43")
         market_size = industry_sizes.get(major_group, 5000000)
         
-        # Generate implementation guide
+        # Generate implementation guide with actual occupation data
         impl_guide = generate_implementation_guide(
             task_statement=task.get("statement_en", ""),
             occupation_title=occ.get("title_en", ""),
@@ -1114,7 +1179,11 @@ async def get_automation_goldmines(limit: int = Query(30, le=50)):
             automation_score=task.get("automatable_score", 0.7),
             importance=task.get("importance", 50),
             edge_cases=task.get("edge_cases", ""),
-            market_size=market_size
+            market_size=market_size,
+            major_group=major_group,
+            skills=occ.get("skills", []),
+            tools=occ.get("tools", []),
+            knowledge=occ.get("knowledge", [])
         )
         
         goldmines.append({
@@ -1143,13 +1212,19 @@ async def get_automation_goldmines(limit: int = Query(30, le=50)):
 
 
 def generate_implementation_guide(task_statement: str, occupation_title: str, automation_type: str, 
-                                  automation_score: float, importance: float, edge_cases: str, market_size: int) -> dict:
-    """Generate complete, specific implementation guide with real code and business metrics"""
+                                  automation_score: float, importance: float, edge_cases: str, market_size: int,
+                                  major_group: str, skills: list, tools: list, knowledge: list) -> dict:
+    """Generate complete, DATA-DRIVEN implementation guide with radical transparency"""
     
     # Clean inputs
     task_statement = task_statement or "Task"
     occupation_title = occupation_title or "Professional"
     edge_cases = edge_cases or "Standard validation required"
+    
+    # Extract actual tools and skills from DB
+    actual_tools = [t["name"] for t in tools[:3]] if tools else ["Industry-standard software"]
+    actual_skills = [s["name"] for s in skills[:3]] if skills else ["Professional judgment"]
+    actual_knowledge = [k["name"] for k in knowledge[:2]] if knowledge else ["Domain expertise"]
     
     # Generate specific product name
     task_short = task_statement[:50].strip()
@@ -1165,78 +1240,196 @@ def generate_implementation_guide(task_statement: str, occupation_title: str, au
             "hosting": "Vercel + Railway/Render"
         }
         sample_code = f'''# FastAPI Backend for {product_name}
+# ⚠️ STARTING TEMPLATE - Requires customization for production
+
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from openai import OpenAI
 import os
+from typing import Optional, List
 
 app = FastAPI()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class TaskInput(BaseModel):
+    """
+    Based on {occupation_title} requirements from O*NET analysis
+    Required skills: {', '.join(actual_skills)}
+    """
     data: str
-    context: str = ""
+    context: Optional[str] = ""
+    
+    @validator('data')
+    def validate_data(cls, v):
+        if not v or len(v) < 10:
+            raise ValueError("Input data too short")
+        # TODO: Add domain-specific validation here
+        return v
 
-@app.post("/api/automate")
+class TaskOutput(BaseModel):
+    success: bool
+    result: str
+    confidence: str  # High, Medium, Low
+    warnings: List[str]
+    validation_required: List[str]
+
+@app.post("/api/automate", response_model=TaskOutput)
 async def automate_task(input: TaskInput):
     """
     Automates: {task_statement}
     For: {occupation_title}
+    
+    PRODUCTION REQUIREMENTS:
+    1. Add authentication/authorization
+    2. Implement rate limiting
+    3. Add input validation for {', '.join(actual_tools) if actual_tools else 'domain tools'}
+    4. Integrate with compliance checking
+    5. Add audit logging
+    6. Implement human review workflow for low-confidence results
     """
     try:
-        prompt = f"""You are automating this task for {occupation_title}:
-Task: {task_statement}
+        # Build context-aware prompt
+        system_context = f"""You are automating tasks for {occupation_title}.
+        
+Required knowledge: {', '.join(actual_knowledge)}
+Key skills: {', '.join(actual_skills)}
+Typical tools: {', '.join(actual_tools)}
+
+CRITICAL: Only use information from input. Flag uncertainties."""
+
+        prompt = f"""Task: {task_statement}
 
 Input data: {{input.data}}
-Context: {{input.context}}
+Context: {{input.context or 'None provided'}}
 
-Edge cases to handle: {edge_cases}
+Edge cases to check: {edge_cases}
 
-Provide structured output in JSON format."""
+Provide analysis in JSON:
+{{
+  "result": "your analysis",
+  "confidence": "High/Medium/Low",
+  "missing_info": ["list any missing critical data"],
+  "validation_needed": ["items requiring human review"]
+}}"""
 
         response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[{{"role": "user", "content": prompt}}],
-            temperature=0.3
+            model="gpt-4o",  # Production: test gpt-4o-mini for cost
+            messages=[
+                {{"role": "system", "content": system_context}},
+                {{"role": "user", "content": prompt}}
+            ],
+            temperature=0.1,  # Low temperature for factual tasks
+            max_tokens=1000
         )
         
         result = response.choices[0].message.content
         
-        return {{
-            "success": True,
-            "result": result,
-            "automation_confidence": {automation_score}
-        }}
+        # TODO: Parse JSON response and validate
+        # TODO: Check confidence threshold
+        # TODO: Route low-confidence to human review
+        # TODO: Log for audit trail
+        
+        return TaskOutput(
+            success=True,
+            result=result,
+            confidence="Medium",  # TODO: Extract from LLM response
+            warnings=["Template response - validate before production use"],
+            validation_required=["Domain expert review needed"]
+        )
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Production: implement proper error handling
+        raise HTTPException(status_code=500, detail=f"Processing error: {{str(e)}}")
 
-# Frontend React Component
+# REQUIRED FOR PRODUCTION:
+# 1. Add /health endpoint
+# 2. Implement retry logic with exponential backoff
+# 3. Add monitoring/alerting (e.g., Sentry)
+# 4. Cache frequent requests
+# 5. Add request validation middleware
+# 6. Implement API versioning
+# 7. Add comprehensive tests (pytest)
+# 8. Document API with OpenAPI/Swagger
+
 """
+# Frontend React Component (Starting Template)
+
 import {{ useState }} from 'react';
 import axios from 'axios';
 
 export default function AutomationTool() {{
   const [input, setInput] = useState('');
   const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [warnings, setWarnings] = useState([]);
   
   const handleSubmit = async () => {{
-    const res = await axios.post('/api/automate', {{ data: input }});
-    setResult(res.data.result);
+    setLoading(true);
+    try {{
+      const res = await axios.post('/api/automate', {{ 
+        data: input,
+        context: "Additional context here"
+      }});
+      
+      setResult(res.data.result);
+      setWarnings(res.data.warnings);
+      
+      // TODO: Handle low-confidence results
+      if (res.data.confidence === 'Low') {{
+        alert('Low confidence - human review required');
+      }}
+      
+    }} catch (err) {{
+      console.error('Automation failed:', err);
+      // TODO: Better error handling
+    }} finally {{
+      setLoading(false);
+    }}
   }};
   
   return (
     <div className="automation-tool">
       <h2>{product_name}</h2>
+      <p className="warning">⚠️ Template interface - customize for production</p>
+      
       <textarea 
         value={{input}} 
         onChange={{(e) => setInput(e.target.value)}}
         placeholder="Enter data to process..."
+        disabled={{loading}}
       />
-      <button onClick={{handleSubmit}}>Automate Task</button>
-      {{result && <div className="result">{{result}}</div>}}
+      
+      <button onClick={{handleSubmit}} disabled={{loading}}>
+        {{loading ? 'Processing...' : 'Automate Task'}}
+      </button>
+      
+      {{warnings.length > 0 && (
+        <div className="warnings">
+          {{warnings.map((w, i) => <p key={{i}}>⚠️ {{w}}</p>)}}
+        </div>
+      )}}
+      
+      {{result && (
+        <div className="result">
+          <h3>Result:</h3>
+          <pre>{{result}}</pre>
+          <p className="disclaimer">
+            ℹ️ Validate this output with a {occupation_title} professional
+          </p>
+        </div>
+      )}}
     </div>
   );
 }}
+
+// REQUIRED FOR PRODUCTION:
+// 1. Add proper form validation
+// 2. Implement loading states
+// 3. Add error boundaries
+// 4. Implement retry logic
+// 5. Add accessibility (ARIA labels)
+// 6. Implement responsive design
+// 7. Add analytics tracking
 """
 '''
     
@@ -1433,17 +1626,25 @@ CREATE INDEX idx_runs_status ON automation_runs(status);
 CREATE INDEX idx_runs_created ON automation_runs(created_at DESC);
 '''
     
-    # Business metrics
-    potential_users = int(market_size * (importance / 100) * 0.1)  # 10% of market at this importance
+    # Business metrics - CONSERVATIVE estimates with transparent methodology
+    # Methodology: market_size × (importance/100) × 0.05 = realistic addressable users
+    potential_users_conservative = int(market_size * (importance / 100) * 0.05)  # 5% of importance-weighted market
+    potential_users_optimistic = int(market_size * (importance / 100) * 0.15)  # 15% (best case)
+    
     time_saved_per_use = 15 if automation_type == "LLM" else 30  # minutes
-    uses_per_user_month = int(importance / 10)  # Higher importance = more frequent use
+    uses_per_user_month = max(int(importance / 15), 2)  # Higher importance = more frequent, min 2x/month
     
-    monthly_value_per_user = (time_saved_per_use * uses_per_user_month * 0.5)  # $0.50/minute saved
-    suggested_price = min(max(int(monthly_value_per_user * 0.3), 29), 199)  # 30% of value, $29-199 range
+    monthly_value_per_user = (time_saved_per_use * uses_per_user_month * 0.5)  # $0.50/minute value
+    suggested_price = min(max(int(monthly_value_per_user * 0.25), 29), 149)  # 25% of value, $29-149 range
     
-    arr_potential = potential_users * suggested_price * 12 * 0.05  # 5% conversion
+    # ARR with explicit assumptions
+    conversion_rate_low = 0.01  # 1% (realistic for SaaS)
+    conversion_rate_high = 0.05  # 5% (optimistic)
     
-    time_to_build = "2-3 days" if automation_type == "LLM" else "4-7 days" if automation_type == "Hybrid" else "3-5 days"
+    arr_potential_low = potential_users_conservative * suggested_price * 12 * conversion_rate_low
+    arr_potential_high = potential_users_optimistic * suggested_price * 12 * conversion_rate_high
+    
+    time_to_build = "3-5 days" if automation_type == "LLM" else "5-10 days" if automation_type == "Hybrid" else "4-7 days"
     
     return {
         "product_name": product_name,
@@ -1452,23 +1653,31 @@ CREATE INDEX idx_runs_created ON automation_runs(created_at DESC);
         "api_endpoints": api_endpoints,
         "database_schema": db_schema,
         "business_metrics": {
-            "potential_users": f"{potential_users:,}",
-            "market_size": f"{market_size:,} {occupation_title}",
+            "methodology": f"Based on O*NET employment data (SOC {major_group}) × task importance ({importance:.0f}/100)",
+            "market_size_total": f"{market_size:,} professionals (O*NET projection)",
+            "addressable_market_conservative": f"{potential_users_conservative:,} users (5% of importance-weighted market)",
+            "addressable_market_optimistic": f"{potential_users_optimistic:,} users (15% best-case)",
             "time_saved_per_use": f"{time_saved_per_use} minutes",
-            "suggested_pricing": f"${suggested_price}/month",
-            "arr_potential": f"${arr_potential:,.0f}" if arr_potential > 10000 else "$50K-500K",
-            "payback_period": "2-4 weeks (if solo indie hacker)"
+            "estimated_uses_per_month": f"{uses_per_user_month}× (based on task importance)",
+            "suggested_pricing": f"${suggested_price}/month (25% of estimated user value)",
+            "arr_potential_range": f"${arr_potential_low:,.0f} - ${arr_potential_high:,.0f}",
+            "assumptions": f"1-5% conversion rate, assumes domain expertise for implementation",
+            "data_source": "O*NET 30.2 employment projections, task importance scores"
         },
         "build_timeline": {
-            "mvp": time_to_build,
-            "with_ui": f"{int(time_to_build.split('-')[0])+2}-{int(time_to_build.split('-')[1].split()[0])+3} days",
-            "production_ready": "2-3 weeks"
+            "mvp_with_domain_expertise": time_to_build,
+            "production_ready": "2-4 weeks (includes testing + compliance)",
+            "assumptions": "Assumes developer familiar with stack + domain expert available for validation",
+            "not_included": "Compliance review, security audit, user testing, deployment infrastructure"
         },
         "go_to_market": {
-            "target_audience": f"{occupation_title} seeking automation",
-            "distribution": "SEO (rank for '{task_statement[:30]}'), LinkedIn outreach, industry forums",
-            "competition": "Low - specific niche automation",
-            "moat": "First-mover in specific task, AI-powered accuracy"
+            "target_audience": f"{occupation_title} with automation needs (task importance: {importance:.0f}/100)",
+            "distribution_channels": "SEO (long-tail keywords), LinkedIn outreach to target profession, industry forums/communities",
+            "competition_level": "Medium - validate with market research before building",
+            "differentiation": "Task-specific automation based on O*NET government data",
+            "validation_required": "Customer discovery interviews with 10-20 target users BEFORE development",
+            "realistic_timeline": "3-6 months to first paying customer",
+            "success_factors": ["Domain expertise", "User validation", "Compliance knowledge"]
         }
     }
 
