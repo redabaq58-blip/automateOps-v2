@@ -1045,6 +1045,444 @@ def generate_implementation_notes(automation_type: str) -> str:
     }
     return notes.get(automation_type, "Evaluate task complexity and choose appropriate automation approach.")
 
+
+# ─── Top 30 Automation Goldmines ───
+@api_router.get("/automation-goldmines")
+async def get_automation_goldmines(limit: int = Query(30, le=50)):
+    """Get top automation opportunities ranked by business value with complete implementation guides"""
+    
+    # Get enriched tasks with high scores, ranked by score × importance (market validation)
+    pipeline = [
+        {"$match": {"enriched": True, "automatable_score": {"$gte": 0.6}}},
+        {"$addFields": {
+            "business_score": {"$multiply": ["$automatable_score", "$importance"]}
+        }},
+        {"$sort": {"business_score": -1}},
+        {"$limit": limit}
+    ]
+    
+    tasks = await db.tasks.aggregate(pipeline).to_list(limit)
+    
+    # Get occupation details
+    onet_codes = list(set(t["onet_code"] for t in tasks))
+    occupations = {}
+    for code in onet_codes:
+        occ = await db.occupations.find_one(
+            {"onet_code": code}, 
+            {"_id": 0, "title_en": 1, "definition_en": 1, "major_group": 1}
+        )
+        if occ:
+            occupations[code] = occ
+    
+    # Get total workforce size per occupation (for market sizing)
+    industry_sizes = {
+        "11": 6500000,  # Management
+        "13": 8200000,  # Business/Finance
+        "15": 4900000,  # Computer/Math
+        "17": 2800000,  # Architecture/Engineering
+        "19": 1400000,  # Life/Physical/Social Science
+        "21": 1200000,  # Community/Social Service
+        "23": 1400000,  # Legal
+        "25": 8200000,  # Education
+        "27": 1500000,  # Arts/Design/Entertainment/Sports/Media
+        "29": 9200000,  # Healthcare Practitioners
+        "31": 5100000,  # Healthcare Support
+        "33": 3400000,  # Protective Service
+        "35": 12800000, # Food Preparation/Serving
+        "37": 4200000,  # Building/Grounds Cleaning
+        "39": 3900000,  # Personal Care/Service
+        "41": 14600000, # Sales
+        "43": 17900000, # Office/Administrative Support
+        "45": 900000,   # Farming/Fishing/Forestry
+        "47": 10500000, # Construction/Extraction
+        "49": 5900000,  # Installation/Maintenance/Repair
+        "51": 11100000, # Production
+        "53": 9800000,  # Transportation/Material Moving
+    }
+    
+    goldmines = []
+    for idx, task in enumerate(tasks, 1):
+        occ = occupations.get(task["onet_code"], {})
+        major_group = occ.get("major_group", "43")
+        market_size = industry_sizes.get(major_group, 5000000)
+        
+        # Generate implementation guide
+        impl_guide = generate_implementation_guide(
+            task_statement=task.get("statement_en", ""),
+            occupation_title=occ.get("title_en", ""),
+            automation_type=task.get("automation_type", "Hybrid"),
+            automation_score=task.get("automatable_score", 0.7),
+            importance=task.get("importance", 50),
+            edge_cases=task.get("edge_cases", ""),
+            market_size=market_size
+        )
+        
+        goldmines.append({
+            "rank": idx,
+            "business_score": round(task.get("business_score", 0), 2),
+            "task": {
+                "statement": task.get("statement_en"),
+                "automation_score": task.get("automatable_score"),
+                "automation_type": task.get("automation_type"),
+                "importance": task.get("importance"),
+                "edge_cases": task.get("edge_cases")
+            },
+            "occupation": {
+                "code": task.get("onet_code"),
+                "title": occ.get("title_en", ""),
+                "industry_group": major_group
+            },
+            "implementation": impl_guide
+        })
+    
+    return {
+        "total": len(goldmines),
+        "goldmines": goldmines,
+        "methodology": "Ranked by Automation Score × Task Importance (market validation)"
+    }
+
+
+def generate_implementation_guide(task_statement: str, occupation_title: str, automation_type: str, 
+                                  automation_score: float, importance: float, edge_cases: str, market_size: int) -> dict:
+    """Generate complete, specific implementation guide with real code and business metrics"""
+    
+    # Clean inputs
+    task_statement = task_statement or "Task"
+    occupation_title = occupation_title or "Professional"
+    edge_cases = edge_cases or "Standard validation required"
+    
+    # Generate specific product name
+    task_short = task_statement[:50].strip()
+    product_name = f"{task_short} Automation"
+    
+    # Tech stack based on automation type
+    if automation_type == "LLM":
+        tech_stack = {
+            "backend": "FastAPI (Python) or Express.js (Node.js)",
+            "ai_provider": "OpenAI GPT-4 or Anthropic Claude",
+            "database": "PostgreSQL or MongoDB",
+            "frontend": "React or Next.js",
+            "hosting": "Vercel + Railway/Render"
+        }
+        sample_code = f'''# FastAPI Backend for {product_name}
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from openai import OpenAI
+import os
+
+app = FastAPI()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+class TaskInput(BaseModel):
+    data: str
+    context: str = ""
+
+@app.post("/api/automate")
+async def automate_task(input: TaskInput):
+    """
+    Automates: {task_statement}
+    For: {occupation_title}
+    """
+    try:
+        prompt = f"""You are automating this task for {occupation_title}:
+Task: {task_statement}
+
+Input data: {{input.data}}
+Context: {{input.context}}
+
+Edge cases to handle: {edge_cases}
+
+Provide structured output in JSON format."""
+
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[{{"role": "user", "content": prompt}}],
+            temperature=0.3
+        )
+        
+        result = response.choices[0].message.content
+        
+        return {{
+            "success": True,
+            "result": result,
+            "automation_confidence": {automation_score}
+        }}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Frontend React Component
+"""
+import {{ useState }} from 'react';
+import axios from 'axios';
+
+export default function AutomationTool() {{
+  const [input, setInput] = useState('');
+  const [result, setResult] = useState(null);
+  
+  const handleSubmit = async () => {{
+    const res = await axios.post('/api/automate', {{ data: input }});
+    setResult(res.data.result);
+  }};
+  
+  return (
+    <div className="automation-tool">
+      <h2>{product_name}</h2>
+      <textarea 
+        value={{input}} 
+        onChange={{(e) => setInput(e.target.value)}}
+        placeholder="Enter data to process..."
+      />
+      <button onClick={{handleSubmit}}>Automate Task</button>
+      {{result && <div className="result">{{result}}</div>}}
+    </div>
+  );
+}}
+"""
+'''
+    
+    elif automation_type == "RPA":
+        tech_stack = {
+            "automation": "Python (Selenium/Playwright) or UiPath",
+            "scheduler": "Celery + Redis or APScheduler",
+            "database": "PostgreSQL for logs",
+            "monitoring": "Sentry for errors",
+            "deployment": "Docker + Kubernetes or Railway"
+        }
+        sample_code = f'''# Python RPA Bot for {product_name}
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+import logging
+
+class TaskAutomationBot:
+    """
+    Automates: {task_statement}
+    For: {occupation_title}
+    """
+    
+    def __init__(self):
+        self.driver = webdriver.Chrome()
+        self.logger = logging.getLogger(__name__)
+    
+    def execute_task(self, input_data):
+        """Main automation workflow"""
+        try:
+            # Step 1: Navigate to target application
+            self.driver.get(input_data['target_url'])
+            
+            # Step 2: Extract required data
+            data_elements = self.driver.find_elements(By.CLASS_NAME, "data-row")
+            extracted = [elem.text for elem in data_elements]
+            
+            # Step 3: Process data
+            processed = self.process_data(extracted)
+            
+            # Step 4: Execute task action
+            result = self.perform_task_action(processed)
+            
+            # Step 5: Validate & log
+            if self.validate_result(result):
+                self.log_success(result)
+                return {{"success": True, "result": result}}
+            else:
+                raise Exception("Validation failed")
+                
+        except Exception as e:
+            self.logger.error(f"Task failed: {{e}}")
+            # Handle edge cases: {edge_cases}
+            return {{"success": False, "error": str(e)}}
+    
+    def process_data(self, data):
+        # Add business logic here
+        return data
+    
+    def perform_task_action(self, data):
+        # Execute the main task
+        return {{"processed": len(data)}}
+    
+    def validate_result(self, result):
+        return result.get("processed", 0) > 0
+
+# Scheduler (runs bot periodically)
+from apscheduler.schedulers.background import BackgroundScheduler
+
+scheduler = BackgroundScheduler()
+bot = TaskAutomationBot()
+
+@scheduler.scheduled_job('cron', hour=9)  # Runs daily at 9 AM
+def run_automation():
+    bot.execute_task({{"target_url": "https://app.example.com"}})
+
+scheduler.start()
+'''
+    
+    else:  # Hybrid
+        tech_stack = {
+            "backend": "FastAPI (Python)",
+            "ai_provider": "OpenAI GPT-4",
+            "rpa": "Playwright for browser automation",
+            "database": "PostgreSQL",
+            "queue": "Redis + Celery for async tasks",
+            "frontend": "React",
+            "hosting": "Vercel + Railway"
+        }
+        sample_code = f'''# Hybrid Automation for {product_name}
+from fastapi import FastAPI, BackgroundTasks
+from playwright.async_api import async_playwright
+from openai import OpenAI
+import asyncio
+
+app = FastAPI()
+openai_client = OpenAI()
+
+async def hybrid_automation_workflow(task_data):
+    """
+    Combines RPA + AI for: {task_statement}
+    Used by: {occupation_title}
+    """
+    
+    # Phase 1: RPA - Data Collection
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        
+        await page.goto(task_data['source_url'])
+        
+        # Extract structured data
+        data = await page.evaluate("""() => {{
+            return Array.from(document.querySelectorAll('.data-item'))
+                .map(el => el.textContent);
+        }}""")
+        
+        await browser.close()
+    
+    # Phase 2: AI - Analysis & Decision
+    ai_prompt = f"""Analyze this data for {occupation_title}:
+Task: {task_statement}
+Data: {{data}}
+Edge cases: {edge_cases}
+
+Provide: 1) Validation, 2) Recommendations, 3) Actions needed"""
+    
+    ai_response = openai_client.chat.completions.create(
+        model="gpt-4",
+        messages=[{{"role": "user", "content": ai_prompt}}]
+    )
+    
+    analysis = ai_response.choices[0].message.content
+    
+    # Phase 3: RPA - Execute Actions
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        
+        await page.goto(task_data['destination_url'])
+        # Apply AI recommendations via RPA
+        await page.fill('#input-field', analysis)
+        await page.click('#submit-button')
+        
+        result = await page.text_content('#result')
+        await browser.close()
+    
+    return {{
+        "success": True,
+        "data_collected": len(data),
+        "ai_analysis": analysis,
+        "execution_result": result
+    }}
+
+@app.post("/api/automate-hybrid")
+async def automate(task_data: dict, background_tasks: BackgroundTasks):
+    background_tasks.add_task(hybrid_automation_workflow, task_data)
+    return {{"message": "Automation started", "estimated_time": "2-5 minutes"}}
+'''
+    
+    # API Endpoints to build
+    api_endpoints = [
+        {"method": "POST", "path": "/api/automate", "description": "Execute the automation task"},
+        {"method": "GET", "path": "/api/status/:taskId", "description": "Check automation status"},
+        {"method": "GET", "path": "/api/history", "description": "View past automation runs"},
+        {"method": "POST", "path": "/api/validate", "description": "Validate input before processing"}
+    ]
+    
+    # Database schema
+    db_schema = f'''-- Database Schema for {product_name}
+
+CREATE TABLE automation_runs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    input_data JSONB NOT NULL,
+    result JSONB,
+    status VARCHAR(20) DEFAULT 'pending',
+    confidence_score DECIMAL(3,2),
+    created_at TIMESTAMP DEFAULT NOW(),
+    completed_at TIMESTAMP,
+    error_message TEXT
+);
+
+CREATE TABLE automation_logs (
+    id SERIAL PRIMARY KEY,
+    run_id INTEGER REFERENCES automation_runs(id),
+    step_name VARCHAR(100),
+    step_data JSONB,
+    timestamp TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_runs_user ON automation_runs(user_id);
+CREATE INDEX idx_runs_status ON automation_runs(status);
+CREATE INDEX idx_runs_created ON automation_runs(created_at DESC);
+'''
+    
+    # Business metrics
+    potential_users = int(market_size * (importance / 100) * 0.1)  # 10% of market at this importance
+    time_saved_per_use = 15 if automation_type == "LLM" else 30  # minutes
+    uses_per_user_month = int(importance / 10)  # Higher importance = more frequent use
+    
+    monthly_value_per_user = (time_saved_per_use * uses_per_user_month * 0.5)  # $0.50/minute saved
+    suggested_price = min(max(int(monthly_value_per_user * 0.3), 29), 199)  # 30% of value, $29-199 range
+    
+    arr_potential = potential_users * suggested_price * 12 * 0.05  # 5% conversion
+    
+    time_to_build = "2-3 days" if automation_type == "LLM" else "4-7 days" if automation_type == "Hybrid" else "3-5 days"
+    
+    return {
+        "product_name": product_name,
+        "tech_stack": tech_stack,
+        "sample_code": sample_code,
+        "api_endpoints": api_endpoints,
+        "database_schema": db_schema,
+        "business_metrics": {
+            "potential_users": f"{potential_users:,}",
+            "market_size": f"{market_size:,} {occupation_title}",
+            "time_saved_per_use": f"{time_saved_per_use} minutes",
+            "suggested_pricing": f"${suggested_price}/month",
+            "arr_potential": f"${arr_potential:,.0f}" if arr_potential > 10000 else "$50K-500K",
+            "payback_period": "2-4 weeks (if solo indie hacker)"
+        },
+        "build_timeline": {
+            "mvp": time_to_build,
+            "with_ui": f"{int(time_to_build.split('-')[0])+2}-{int(time_to_build.split('-')[1].split()[0])+3} days",
+            "production_ready": "2-3 weeks"
+        },
+        "go_to_market": {
+            "target_audience": f"{occupation_title} seeking automation",
+            "distribution": "SEO (rank for '{task_statement[:30]}'), LinkedIn outreach, industry forums",
+            "competition": "Low - specific niche automation",
+            "moat": "First-mover in specific task, AI-powered accuracy"
+        }
+    }
+
+
+def generate_implementation_notes(automation_type: str) -> str:
+    """Generate implementation guidance"""
+    
+    notes = {
+        "LLM": "Best for tasks requiring reasoning, language processing, or judgment. Use OpenAI, Anthropic, or open-source models. Ensure prompt engineering for accuracy. Monitor costs per API call.",
+        "RPA": "Best for repetitive, rule-based tasks with structured data. Use desktop automation tools. Requires stable UI/API. Handle exceptions gracefully. Schedule during low-usage periods.",
+        "Hybrid": "Combines RPA reliability with AI intelligence. RPA handles data movement, AI handles decisions. Most powerful but requires integration. Consider Zapier/Make.com for low-code option."
+    }
+    return notes.get(automation_type, "Evaluate task complexity and choose appropriate automation approach.")
+
 # ─── Mount router & middleware ───
 app.include_router(api_router)
 

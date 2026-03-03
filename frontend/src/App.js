@@ -13,6 +13,7 @@ import Dashboard from '@/pages/Dashboard';
 import AdminPanel from '@/pages/AdminPanel';
 import AutomationHeatmap from '@/pages/AutomationHeatmap';
 import AutomationBuilder from '@/pages/AutomationBuilder';
+import AutomationGoldmines from '@/pages/AutomationGoldmines';
 import '@/App.css';
 
 // Auth Context
@@ -81,6 +82,7 @@ function App() {
               <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/heatmap" element={<AutomationHeatmap />} />
               <Route path="/automation-builder" element={<AutomationBuilder />} />
+              <Route path="/goldmines" element={<AutomationGoldmines />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/auth" element={<AuthPage />} />
