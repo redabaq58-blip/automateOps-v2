@@ -1,53 +1,92 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'sonner';
+import { authAPI } from '@/lib/api';
+import Layout from '@/components/layout/Layout';
+import HomePage from '@/pages/HomePage';
+import SearchResults from '@/pages/SearchResults';
+import OccupationDetail from '@/pages/OccupationDetail';
+import IndustryBrowser from '@/pages/IndustryBrowser';
+import Marketplace from '@/pages/Marketplace';
+import AuthPage from '@/pages/AuthPage';
+import Dashboard from '@/pages/Dashboard';
+import AdminPanel from '@/pages/AdminPanel';
+import AutomationHeatmap from '@/pages/AutomationHeatmap';
+import '@/App.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+// Auth Context
+const AuthContext = createContext(null);
+export const useAuth = () => useContext(AuthContext);
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    helloWorldApi();
+    const token = localStorage.getItem('aod_token');
+    if (token) {
+      authAPI.me()
+        .then(res => setUser(res.data))
+        .catch(() => localStorage.removeItem('aod_token'))
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
   }, []);
 
+  const login = (token, userData) => {
+    localStorage.setItem('aod_token', token);
+    setUser(userData);
+  };
+
+  const logout = () => {
+    localStorage.removeItem('aod_token');
+    setUser(null);
+  };
+
   return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
   );
-};
+}
+
+// Language Context
+const LangContext = createContext(null);
+export const useLang = () => useContext(LangContext);
+
+function LangProvider({ children }) {
+  const [lang, setLang] = useState('en');
+  const toggle = () => setLang(l => l === 'en' ? 'fr' : 'en');
+  return (
+    <LangContext.Provider value={{ lang, setLang, toggle }}>
+      {children}
+    </LangContext.Provider>
+  );
+}
 
 function App() {
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <AuthProvider>
+      <LangProvider>
+        <BrowserRouter>
+          <Toaster position="top-right" theme="dark" richColors />
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/search" element={<SearchResults />} />
+              <Route path="/occupation/:code" element={<OccupationDetail />} />
+              <Route path="/industries" element={<IndustryBrowser />} />
+              <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/heatmap" element={<AutomationHeatmap />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/admin" element={<AdminPanel />} />
+              <Route path="/auth" element={<AuthPage />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </LangProvider>
+    </AuthProvider>
   );
 }
 
